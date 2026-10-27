@@ -1,0 +1,15 @@
+{
+  "name": "pocketbank",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["client", "server"],
+  "engines": { "node": ">=24.15.0 <25" },
+  "scripts": {
+    "start": "concurrently --kill-others --names api,web \"npm run dev --workspace server\" \"npm start --workspace client\"",
+    "build": "npm run build --workspace server && npm run build --workspace client",
+    "check": "npm run check --workspace server",
+    "test": "npm test --workspace server"
+  },
+  "devDependencies": { "concurrently": "^9.2.1" },
+  "overrides": { "@angular/build": { "vite": "8.3.5" } }
+}

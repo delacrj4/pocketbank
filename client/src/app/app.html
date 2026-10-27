@@ -1,0 +1,94 @@
+﻿@if (loading()) {
+  <main class="auth-shell"><p role="status">Loading PocketBank…</p></main>
+} @else if (!state()) {
+  <main class="auth-shell">
+    <a class="brand" href="/"><span class="mark">P</span>PocketBank</a>
+    <section class="auth-card">
+      <h1>{{ registerMode() ? 'Create account' : 'Sign in' }}</h1>
+      @if (registerMode()) { <p class="muted">Includes a checking account with $1,000 in pretend funds.</p> }
+      <form (ngSubmit)="authenticate()">
+        <fieldset [disabled]="busy()">
+          @if (registerMode()) { <label>Display name<input name="displayName" [(ngModel)]="displayName" required maxlength="60" autocomplete="nickname"></label> }
+          <label>Email<input name="email" type="email" [(ngModel)]="email" required maxlength="254" autocomplete="email"></label>
+          <label>Password<input name="password" type="password" [(ngModel)]="password" required minlength="6" maxlength="128" [autocomplete]="registerMode() ? 'new-password' : 'current-password'" aria-describedby="password-help"></label>
+          <p id="password-help" class="muted">At least 6 characters. No special characters required.</p>
+          @if (registerMode()) {
+            <label>Confirm password<input name="confirmPassword" type="password" [(ngModel)]="confirmPassword" required minlength="6" maxlength="128" autocomplete="new-password"></label>
+          }
+          <p class="error" role="alert">{{ error() }}</p>
+          <button type="submit">{{ busy() ? 'Please wait…' : registerMode() ? 'Create account' : 'Sign in' }}</button>
+        </fieldset>
+      </form>
+      <button class="text-button" type="button" [disabled]="busy()" (click)="registerMode.set(!registerMode()); error.set(''); password = ''; confirmPassword = ''">{{ registerMode() ? 'Already registered? Sign in' : 'Create an account' }}</button>
+    </section>
+    <p class="muted">Local app · Pretend money</p>
+  </main>
+} @else {
+<div class="layout">
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="PocketBank home"><span class="mark">P</span>PocketBank</a>
+    <nav aria-label="Main navigation">
+      <a href="#overview" class="active">◈ <span>Overview</span></a>
+      <a href="#accounts">▣ <span>Accounts</span></a>
+      <a href="#activity">↔ <span>Transactions</span></a>
+    </nav>
+    <div class="profile"><span class="avatar">{{ state()!.user.displayName.slice(0, 1) }}</span><div>{{ state()!.user.displayName }}<small>{{ state()!.user.email }}</small></div></div>
+  </aside>
+  <div class="workspace">
+    <header><span>PocketBank <span class="slash">/</span> Overview</span><div class="actions"><span class="badge">LOCAL</span><button class="text-button" type="button" [disabled]="busy()" (click)="logout()">Log out</button></div></header>
+    <main id="overview">
+      <div class="heading-row"><h1>Overview</h1><button type="button" [disabled]="busy()" (click)="startTransfer()">Transfer money</button></div>
+      @if (!transferOpen()) { <p class="error" role="alert">{{ error() }}</p> }
+      <section class="balance-banner" aria-labelledby="total-title">
+        <div><p id="total-title" class="eyebrow">TOTAL BALANCE</p><div class="total">{{ totalCents() / 100 | currency:'USD' }}</div><p>{{ accounts().length }} {{ accounts().length === 1 ? 'account' : 'accounts' }} · USD</p></div>
+      </section>
+      <section id="accounts" aria-labelledby="accounts-title">
+        <div class="section-heading"><h2 id="accounts-title">Accounts</h2></div>
+        <div class="account-grid">
+          @for (account of accounts(); track account.number) {
+            <article class="account-card">
+              <div class="account-top"><span class="account-icon">{{ account.kind === 'checking' ? '▣' : '◇' }}</span><span class="account-type">{{ account.kind }}</span></div>
+              <h3>{{ account.name }}</h3><p class="muted account-number">Account: <span class="account-number-value">{{ account.number }}</span></p>
+              <div class="account-balance">{{ account.balanceCents / 100 | currency:'USD' }}</div><p class="muted">Available balance</p>
+              <a class="text-button" href="#activity" (click)="historyFilter.set(account.kind)">View activity <span aria-hidden="true">→</span></a>
+            </article>
+          }
+          @if (!savings()) {
+            <article class="account-card savings-prompt"><span class="account-icon">◇</span><h3>Savings account</h3><p class="muted">Opening balance: $0.00.</p><button class="secondary" type="button" [disabled]="busy()" (click)="openSavings()">Open savings</button></article>
+          }
+        </div>
+      </section>
+      <p class="feedback" role="status">{{ message() }}</p>
+      @if (transferOpen()) {
+        <section class="transfer-panel" aria-labelledby="transfer-title">
+          <div class="section-heading"><h2 id="transfer-title">{{ review() ? 'Review transfer' : 'Transfer money' }}</h2><button class="text-button" type="button" [disabled]="busy()" (click)="transferOpen.set(false); error.set('')">Cancel</button></div>
+          @if (review(); as transfer) {
+            <dl class="review"><div><dt>From account</dt><dd>•••• {{ transfer.sourceNumber.slice(-4) }}</dd></div><div><dt>Recipient</dt><dd class="recipient-name">{{ transfer.recipientName }}</dd></div><div><dt>To {{ transfer.destinationKind }}</dt><dd>•••• {{ transfer.destinationNumber.slice(-4) }}</dd></div><div><dt>Amount</dt><dd>{{ transfer.amountCents / 100 | currency:'USD' }}</dd></div></dl>
+            <div class="actions"><button type="button" [disabled]="busy()" (click)="confirmTransfer()">{{ busy() ? 'Sending…' : 'Confirm transfer' }}</button><button class="secondary" type="button" [disabled]="busy()" (click)="review.set(null); error.set('')">Edit</button></div>
+          } @else {
+            <form (ngSubmit)="reviewTransfer()" novalidate>
+              <fieldset [disabled]="busy()"><div class="form-grid">
+                <label>From account<select name="source" [(ngModel)]="from">@for (account of accounts(); track account.number) { <option [value]="account.kind">{{ account.name }}</option> }</select></label>
+                <label>Destination<select name="destinationMode" [(ngModel)]="destinationMode"><option value="own" [disabled]="!savings()">My {{ from === 'checking' ? 'savings' : 'checking' }}</option><option value="other">Another user's checking</option></select></label>
+                <label>Amount (USD)<input name="amount" type="text" inputmode="decimal" placeholder="0.00" [(ngModel)]="amount" required maxlength="16"></label>
+                @if (destinationMode === 'other') { <label class="recipient-field">Recipient checking account number<input name="recipient" [(ngModel)]="recipientNumber" required minlength="16" maxlength="16" autocomplete="off" spellcheck="false" aria-describedby="transfer-error"></label> }
+              </div><button class="review-button" type="submit">{{ busy() ? 'Checking…' : 'Review transfer' }}</button></fieldset>
+            </form>
+          }
+          <p id="transfer-error" class="error" role="alert">{{ error() }}</p>
+        </section>
+      }
+      <section id="activity" class="activity-panel" aria-labelledby="activity-title">
+        <div class="section-heading"><h2 id="activity-title">Transactions</h2><label class="filter-label">Account<select [ngModel]="historyFilter()" (ngModelChange)="historyFilter.set($event)"><option value="all">All accounts</option>@for (account of accounts(); track account.number) { <option [value]="account.kind">{{ account.name }}</option> }</select></label></div>
+        <div class="table-scroll"><table><thead><tr><th scope="col">Transaction</th><th scope="col">Date</th><th scope="col">Status</th><th scope="col" class="amount-column">Amount</th></tr></thead><tbody>
+          @for (transaction of transactions(); track transaction.reference) {
+            <tr><td><div class="transaction-name">{{ transaction.description }}</div><div class="muted transaction-detail">{{ transaction.from ?? 'External' }} → {{ transaction.to ?? 'External' }}</div><div class="reference">{{ transaction.reference }}</div></td><td class="date">{{ transaction.createdAt | date:'MMM d, y' }}<small>{{ transaction.createdAt | date:'h:mm a' }}</small></td><td><span class="completed">Completed</span></td><td class="amount-column" [class.credit]="transaction.direction === 'incoming'" [class.outgoing]="transaction.direction === 'outgoing'">{{ transaction.direction === 'incoming' ? '+' : transaction.direction === 'outgoing' ? '−' : '' }}{{ transaction.amountCents / 100 | currency:'USD' }}<small>{{ transaction.direction === 'internal' ? 'Between your accounts' : transaction.direction === 'incoming' ? 'Received' : 'Sent' }}</small></td></tr>
+          } @empty { <tr><td colspan="4" class="empty">No transactions for this account.</td></tr> }
+        </tbody></table></div>
+      </section>
+      <footer><span>Local app · Pretend money</span><button class="text-button" type="button" [disabled]="busy()" (click)="refreshDashboard()">Refresh balances</button></footer>
+    </main>
+  </div>
+</div>
+}
+

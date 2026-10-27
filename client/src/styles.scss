@@ -1,0 +1,6 @@
+﻿:root { color-scheme: dark; font-family: 'Segoe UI', system-ui, sans-serif; color: #edf1fa; background: #090c12; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, a { -webkit-tap-highlight-color: transparent; }
+button { font: inherit; }
+:focus-visible { outline: 3px solid #93bbff; outline-offset: 5px; }
